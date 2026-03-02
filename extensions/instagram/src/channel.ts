@@ -16,6 +16,23 @@ import {
   type ResolvedInstagramAccount,
 } from "./types.js";
 
+async function ensureInstagramCliAvailable(cliPath: string): Promise<void> {
+  const runtime = getInstagramRuntime();
+  const check = await runtime.system.runCommandWithTimeout(`${cliPath} --version`, 20_000);
+  if (check.exitCode === 0) return;
+
+  // Fallback bootstrap for default CLI name so integration behaves like a built-in channel dependency.
+  if (cliPath.trim() === "instagram-cli") {
+    await runtime.system.runCommandWithTimeout("npm install -g @i7m/instagram-cli", 180_000);
+    const recheck = await runtime.system.runCommandWithTimeout(`${cliPath} --version`, 20_000);
+    if (recheck.exitCode === 0) return;
+  }
+
+  throw new Error(
+    `Instagram CLI not available. Set channels.instagram.cliPath or install @i7m/instagram-cli.`,
+  );
+}
+
 export const instagramPlugin: ChannelPlugin<ResolvedInstagramAccount> = {
   id: "instagram",
   meta: {
@@ -228,6 +245,7 @@ export const instagramPlugin: ChannelPlugin<ResolvedInstagramAccount> = {
   gateway: {
     startAccount: async (ctx) => {
       const account = ctx.account;
+      await ensureInstagramCliAvailable(account.cliPath);
       const pwd = account.passwordEnv
         ? (process.env[account.passwordEnv]?.trim() ?? "")
         : (account.password ?? "");

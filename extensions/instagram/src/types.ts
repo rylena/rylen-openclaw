@@ -38,7 +38,7 @@ export function resolveInstagramAccount(params: {
   const scoped = accountId === DEFAULT_ACCOUNT_ID ? undefined : base.accounts?.[accountId];
   const username = scoped?.username ?? base.username;
   const password = scoped?.password ?? base.password;
-  const passwordEnv = scoped?.passwordEnv ?? base.passwordEnv;
+  const passwordEnv = scoped?.passwordEnv ?? base.passwordEnv ?? "INSTAGRAM_PASSWORD";
   const cliPath = scoped?.cliPath ?? base.cliPath ?? "instagram-cli";
   const pollIntervalMs = scoped?.pollIntervalMs ?? base.pollIntervalMs ?? 6000;
   const enabled = (scoped?.enabled ?? base.enabled ?? true) !== false;

@@ -4,8 +4,9 @@ This plugin wires Instagram DMs into OpenClaw using `instagram-cli` (LLM mode).
 
 ## Requirements
 
-- `instagram-cli` installed and authenticated at least once.
 - Recommended fork: `instagram-cli-4llm` with `llm` commands.
+- If `instagram-cli` is missing and `cliPath` is default, plugin auto-bootstraps with:
+  - `npm install -g @i7m/instagram-cli`
 
 ## Config
 
@@ -24,7 +25,7 @@ This plugin wires Instagram DMs into OpenClaw using `instagram-cli` (LLM mode).
 }
 ```
 
-Set password via env:
+Set password via env (default env key is `INSTAGRAM_PASSWORD`):
 
 ```bash
 export INSTAGRAM_PASSWORD='...'
