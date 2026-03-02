@@ -18,14 +18,17 @@ import {
 
 async function ensureInstagramCliAvailable(cliPath: string): Promise<void> {
   const runtime = getInstagramRuntime();
-  const check = await runtime.system.runCommandWithTimeout(`${cliPath} --version`, 20_000);
-  if (check.exitCode === 0) return;
+  const check = await runtime.system.runCommandWithTimeout([cliPath, "--version"], 20_000);
+  if (check.code === 0) return;
 
   // Fallback bootstrap for default CLI name so integration behaves like a built-in channel dependency.
   if (cliPath.trim() === "instagram-cli") {
-    await runtime.system.runCommandWithTimeout("npm install -g @i7m/instagram-cli", 180_000);
-    const recheck = await runtime.system.runCommandWithTimeout(`${cliPath} --version`, 20_000);
-    if (recheck.exitCode === 0) return;
+    await runtime.system.runCommandWithTimeout(
+      ["npm", "install", "-g", "@i7m/instagram-cli"],
+      180_000,
+    );
+    const recheck = await runtime.system.runCommandWithTimeout([cliPath, "--version"], 20_000);
+    if (recheck.code === 0) return;
   }
 
   throw new Error(
@@ -57,19 +60,22 @@ export const instagramPlugin: ChannelPlugin<ResolvedInstagramAccount> = {
   configSchema: buildChannelConfigSchema(InstagramConfigSchema),
   config: {
     listAccountIds: (cfg) => listInstagramAccountIds(cfg),
-    resolveAccount: (cfg, accountId) => resolveInstagramAccount({ cfg, accountId }),
+    resolveAccount: (cfg, accountId) =>
+      resolveInstagramAccount({ cfg, accountId: accountId ?? undefined }),
     defaultAccountId: (cfg) => resolveDefaultInstagramAccountId(cfg),
     isConfigured: (account) => Boolean(account.username),
     describeAccount: (account) => ({
       accountId: account.accountId,
-      name: account.name,
+      name: account.name ?? undefined,
       enabled: account.enabled,
       configured: account.configured,
-      username: account.username,
+      username: account.username ?? undefined,
       cliPath: account.cliPath,
     }),
     resolveAllowFrom: ({ cfg, accountId }) =>
-      (resolveInstagramAccount({ cfg, accountId }).config.allowFrom ?? []).map(String),
+      (
+        resolveInstagramAccount({ cfg, accountId: accountId ?? undefined }).config.allowFrom ?? []
+      ).map(String),
     formatAllowFrom: ({ allowFrom }) =>
       allowFrom
         .map((entry) => String(entry).trim())
@@ -79,10 +85,17 @@ export const instagramPlugin: ChannelPlugin<ResolvedInstagramAccount> = {
   pairing: {
     idLabel: "instagramUserId",
     normalizeAllowEntry: (entry) => entry.replace(/^instagram:(?:user:)?/i, ""),
-    notifyApproval: async ({ cfg, id, accountId }) => {
-      const account = resolveInstagramAccount({ cfg, accountId });
+    notifyApproval: async ({ cfg, id }) => {
+      const account = resolveInstagramAccount({ cfg });
       await getInstagramRuntime().system.runCommandWithTimeout(
-        `${account.cliPath} llm send ${JSON.stringify(id)} ${JSON.stringify("Your OpenClaw pairing request was approved.")} ${JSON.stringify(account.username ?? "")}`,
+        [
+          account.cliPath,
+          "llm",
+          "send",
+          id,
+          "Your OpenClaw pairing request was approved.",
+          account.username ?? "",
+        ],
         45_000,
       );
     },
@@ -115,12 +128,9 @@ export const instagramPlugin: ChannelPlugin<ResolvedInstagramAccount> = {
     chunker: (text, limit) => getInstagramRuntime().channel.text.chunkMarkdownText(text, limit),
     textChunkLimit: 1200,
     sendText: async ({ to, text, accountId, cfg }) => {
-      const account = resolveInstagramAccount({ cfg, accountId });
-      const quotedTo = JSON.stringify(to);
-      const quotedText = JSON.stringify(text);
-      const quotedUser = JSON.stringify(account.username ?? "");
+      const account = resolveInstagramAccount({ cfg, accountId: accountId ?? undefined });
       await getInstagramRuntime().system.runCommandWithTimeout(
-        `${account.cliPath} llm send ${quotedTo} ${quotedText} ${quotedUser}`,
+        [account.cliPath, "llm", "send", to, text, account.username ?? ""],
         45_000,
       );
       return { channel: "instagram" as const, messageId: `ig-${Date.now()}`, chatId: to };
@@ -130,7 +140,7 @@ export const instagramPlugin: ChannelPlugin<ResolvedInstagramAccount> = {
     defaultRuntime: createDefaultChannelRuntimeState(DEFAULT_ACCOUNT_ID),
     collectStatusIssues: (accounts) =>
       accounts
-        .filter((account) => !account.username)
+        .filter((account) => !account.configured)
         .map((account) => ({
           channel: "instagram" as const,
           accountId: account.accountId,
@@ -146,10 +156,10 @@ export const instagramPlugin: ChannelPlugin<ResolvedInstagramAccount> = {
     }),
     buildAccountSnapshot: ({ account, runtime }) => ({
       accountId: account.accountId,
-      name: account.name,
+      name: account.name ?? undefined,
       enabled: account.enabled,
       configured: account.configured,
-      username: account.username,
+      username: account.username ?? undefined,
       running: runtime?.running ?? false,
       lastStartAt: runtime?.lastStartAt ?? null,
       lastStopAt: runtime?.lastStopAt ?? null,
@@ -250,15 +260,16 @@ export const instagramPlugin: ChannelPlugin<ResolvedInstagramAccount> = {
         ? (process.env[account.passwordEnv]?.trim() ?? "")
         : (account.password ?? "");
       if (account.username && pwd) {
-        const loginCmd = `${account.cliPath} auth login --username ${JSON.stringify(account.username)} ${JSON.stringify(pwd)}`;
-        await getInstagramRuntime().system.runCommandWithTimeout(loginCmd, 120_000);
+        await getInstagramRuntime().system.runCommandWithTimeout(
+          [account.cliPath, "auth", "login", "--username", account.username, pwd],
+          120_000,
+        );
       }
       return monitorInstagramProvider({
         account,
         accountId: account.accountId,
         cfg: ctx.cfg,
         abortSignal: ctx.abortSignal,
-        statusSink: (patch) => ctx.setStatus(patch),
       });
     },
     logoutAccount: async ({ cfg, accountId }) => {

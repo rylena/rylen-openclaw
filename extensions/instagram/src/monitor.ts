@@ -44,21 +44,16 @@ function parseLastJsonObject<T>(raw: string): JsonEnvelope<T> | null {
   return null;
 }
 
-async function runLlmCommand<T>(
-  cliPath: string,
-  args: string[],
-): Promise<JsonEnvelope<T>> {
+async function runLlmCommand<T>(cliPath: string, args: string[]): Promise<JsonEnvelope<T>> {
   const runtime = getInstagramRuntime();
-  const cmd = [cliPath, "llm", ...args]
-    .map((part) => (part.includes(" ") ? JSON.stringify(part) : part))
-    .join(" ");
-  const result = await runtime.system.runCommandWithTimeout(cmd, 60_000);
+  const argv = [cliPath, "llm", ...args];
+  const result = await runtime.system.runCommandWithTimeout(argv, 60_000);
   const parsed = parseLastJsonObject<T>(result.stdout ?? "");
   if (parsed) return parsed;
-  if (result.exitCode !== 0) {
+  if (result.code !== 0) {
     return {
       ok: false,
-      error: { message: result.stderr?.trim() || `Command failed: ${cmd}` },
+      error: { message: result.stderr?.trim() || `Command failed: ${argv.join(" ")}` },
     };
   }
   return { ok: false, error: { message: "Invalid JSON output from instagram-cli" } };
@@ -72,16 +67,13 @@ async function deliverInstagramReply(params: {
 }): Promise<void> {
   const { payload, threadId, account, statusSink } = params;
   if (!payload.text?.trim()) return;
-  await runLlmCommand(account.cliPath, [
-    "send",
-    threadId,
-    payload.text,
-    account.username ?? "",
-  ]);
+  await runLlmCommand(account.cliPath, ["send", threadId, payload.text, account.username ?? ""]);
   statusSink?.({ lastOutboundAt: Date.now() });
 }
 
-export async function monitorInstagramProvider(options: MonitorOptions): Promise<{ stop: () => void }> {
+export async function monitorInstagramProvider(
+  options: MonitorOptions,
+): Promise<{ stop: () => void }> {
   const { account, accountId, cfg, abortSignal, statusSink } = options;
   const core = getInstagramRuntime();
   const logger = core.logging.getChildLogger({ module: "instagram", accountId });
