@@ -1,0 +1,32 @@
+{
+  "name": "@openclaw/instagram",
+  "version": "2026.3.2",
+  "description": "OpenClaw Instagram channel plugin via instagram-cli-4llm",
+  "type": "module",
+  "dependencies": {
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "openclaw": "workspace:*"
+  },
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ],
+    "channel": {
+      "id": "instagram",
+      "label": "Instagram",
+      "selectionLabel": "Instagram (DM)",
+      "docsPath": "/channels/instagram",
+      "docsLabel": "instagram",
+      "blurb": "Instagram DM integration via instagram-cli-4llm",
+      "order": 68,
+      "quickstartAllowFrom": true
+    },
+    "install": {
+      "npmSpec": "@openclaw/instagram",
+      "localPath": "extensions/instagram",
+      "defaultChoice": "local"
+    }
+  }
+}
